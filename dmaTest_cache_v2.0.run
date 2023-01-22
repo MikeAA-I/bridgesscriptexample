@@ -15,6 +15,40 @@ help()
 		
 }
 
+writebuffer_fixpattern()
+{
+count=0
+addrAd=0
+startAddr=$1
+while [ $count -le 128 ]
+do
+addrAd=$((0x4*$count))
+addr=$(($startAddr+$addrAd))
+pattern=$2
+#echo $addr $pattern
+devmem2 $addr w $pattern >& /dev/null
+((count++))
+done
+
+}
+
+writebuffer_pattern()
+{
+count=0
+addrAd=0
+startAddr=$1
+while [ $count -le 128 ]
+do
+addrAd=$((0x4*$count))
+addr=$(($startAddr+$addrAd))
+pattern=$(($2+$addrAd))
+#echo $addr $pattern
+devmem2 $addr w $pattern >& /dev/null
+((count++))
+done
+
+}
+
 commandname=$0;
 select=""
 options=$(getopt -l "help,privilaged-only,privilaged-secure,ccu-uncached,ccu-cached"  -o "hpsuc" -a "--"  "$@") 
@@ -66,21 +100,20 @@ write_buffer_cma_reserved=10000000
 CCU_cached="disabled"
 
 #Bridges pointers
-#icct_csr=0xf9000008
-icct_csr=0xf9000010
+icct_csr=0xf9000008
 msgdma_csr=0xf9000040
-msgdma_descriptorslave=0xf9000020
-msgda_response=0xf9000008
+msgdma_descriptorlave=0xf9000020
+msgdma_response=0xf9000010
 
 
 #offsets
 msgdma_csr_control=0x4
-msgdma_descriptorslave_read_high=0x14
-msgdma_descriptorslave_write_low=0x4
-msgdma_descriptorslave_write_high=0x18
-msgdma_descriptorslave_length=0x8
-msgdma_descriptorslave_burst=0xc
-msgdma_descriptorslave_control=0x1c
+msgdma_descriptorlave_read_high=0x14
+msgdma_descriptorlave_write_low=0x4
+msgdma_descriptorlave_write_high=0x18
+msgdma_descriptorlave_length=0x8
+msgdma_descriptorlave_burst=0xc
+msgdma_descriptorlave_control=0x1c
 
 
 
@@ -335,7 +368,7 @@ echo  "4 CCU cached  "
 #Cache tests
 #3. non cashed transactions
 #-Write to cashed area from user space
-#-Write to cached area via dma in non cachsed mode 
+#-Write to cached area via dma in  cached mode 
 #-Read back from user space
 
 
@@ -403,36 +436,17 @@ echo "Read ACE-LITE Bridge Mode"
 devmem2 $icct_csr w
 echo "########################################"
 echo "Creating populated data buffer at 0x$read_buffer0_manual_reserved in unused memory (above 1GB) "
-count=0
-addrAd=0
-startAddr=0x$read_buffer0_manual_reserved
-while [ $count -le 128 ]
-do
-addrAd=$((0x4*$count))
-addr=$(($startAddr+$addrAd))
-pattern=$(($datapattern_buffer0+$addrAd))
-#echo $addr $pattern
-devmem2 $addr w $pattern >& /dev/null
-((count++))
-done
+
+
+writebuffer_pattern 0x$read_buffer0_manual_reserved $datapattern_buffer0
 
 echo "Check data by reading 1st address"
 devmem2 0x$read_buffer0_manual_reserved w
 echo "########################################"
 
 echo "Creating populated data buffer at in CMA reserved cached memory at 0x$read_buffer1_cma_reserved from userspace"
-count=0
-addrAd=0
-startAddr=0x$read_buffer1_cma_reserved
-while [ $count -le 128 ]
-do
-addrAd=$((0x4*$count))
-addr=$(($startAddr+$addrAd))
-pattern=$(($datapattern_buffer1+$addrAd))
-#echo $addr $pattern
-devmem2 $addr w $pattern >& /dev/null
-((count++))
-done
+
+writebuffer_pattern 0x$read_buffer1_cma_reserved $datapattern_buffer1
 
 echo "Check data by reading 1st address"
 devmem2 0x$read_buffer1_cma_reserved w
@@ -441,18 +455,8 @@ echo "########################################"
 #ccu_cached
 if [ $CCU_cached = "enabled" ]; then
 echo "Clearing manual write buffer 0x$write_buffer_manual_reserved in unused memory (above 1GB) to 0x0A0A0A0A"
-count=0
-addrAd=0
-startAddr=0x$write_buffer_manual_reserved
-while [ $count -le 128 ]
-do
-addrAd=$((0x4*$count))
-addr=$(($startAddr+$addrAd))
-pattern=$((0x0A0A0A0A))
-#echo $addr $pattern
-devmem2 $addr w $pattern >& /dev/null
-((count++))
-done
+
+writebuffer_fixpattern 0x$write_buffer_manual_reserved $((0x0A0A0A0A))
 
 echo "Check data by reading 1st address"
 devmem2 0x$write_buffer_manual_reserved w
@@ -460,18 +464,8 @@ echo "########################################"
 sleep 5
 
 echo "Clearing cma write buffer 0x$write_buffer_cma_reserved in unused memory (above 1GB) to 0x0B0B0B0B"
-count=0
-addrAd=0
-startAddr=0x$write_buffer_cma_reserved
-while [ $count -le 128 ]
-do
-addrAd=$((0x4*$count))
-addr=$(($startAddr+$addrAd))
-pattern=$((0x0B0B0B0B))
-#echo $addr $pattern
-devmem2 $addr w $pattern >& /dev/null
-((count++))
-done
+
+writebuffer_fixpattern 0x$write_buffer_cma_reserved  $((0x0B0B0B0B))
 
 echo "Check data by reading 1st address"
 devmem2 0x$write_buffer_cma_reserved w
@@ -505,15 +499,15 @@ devmem2 $(($msgdma_csr+$msgdma_csr_control))  w 0x2
 #Create descriptor in memory 
 
 echo "msgdma : Read address,  lower 32bits, upper 32bits : 0x$dma_read_pointer_high$dma_read_pointer_low"
-devmem2 $msgdma_descriptorslave w 0x$dma_read_pointer_low
-devmem2 $(($msgdma_descriptorslave+$msgdma_descriptorslave_read_high)) w 0x$dma_read_pointer_high
+devmem2 $msgdma_descriptorlave w 0x$dma_read_pointer_low
+devmem2 $(($msgdma_descriptorlave+$msgdma_descriptorlave_read_high)) w 0x$dma_read_pointer_high
 echo "msgdma : Write address, lower 32bits, upper 32bits : 0x$dma_write_pointer_high$dma_write_pointer_low"
-devmem2 $(($msgdma_descriptorslave+$msgdma_descriptorslave_write_low))  w 0x$dma_write_pointer_low
-devmem2 $(($msgdma_descriptorslave+$msgdma_descriptorslave_write_high)) w 0x$dma_wrtie_pointer_high
+devmem2 $(($msgdma_descriptorlave+$msgdma_descriptorlave_write_low))  w 0x$dma_write_pointer_low
+devmem2 $(($msgdma_descriptorlave+$msgdma_descriptorlave_write_high)) w 0x$dma_wrtie_pointer_high
 echo "msgdma : length in bytes 4068,  128bit x 32"
-devmem2 $(($msgdma_descriptorslave+$msgdma_descriptorslave_length)) w 0x200
+devmem2 $(($msgdma_descriptorlave+$msgdma_descriptorlave_length)) w 0x200
 echo "msgdma : Burst counts 32, sequence number = 1"
-devmem2 $(($msgdma_descriptorslave+$msgdma_descriptorslave_burst)) w  0x20200001  ; #2020 0001
+devmem2 $(($msgdma_descriptorlave+$msgdma_descriptorlave_burst)) w  0x20200001  ; #2020 0001
 # stride = 1 (word addresses, increment )  N/A Stride is currently disabled on the IP 
 # devmem2 0xf9000030 w   0x0101 ; 0000 0001 0000 0001
 		
@@ -540,14 +534,14 @@ devmem2 $msgdma_csr w
 #Trans channel 00000000
 #1000 0010 0000 0000
 echo "msgdma : Control,  wait for resp"
-devmem2 $(($msgdma_descriptorslave+$msgdma_descriptorslave_control)) w  0x02000000 ; #0000 0010 0000 0000
+devmem2 $(($msgdma_descriptorlave+$msgdma_descriptorlave_control)) w  0x02000000 ; #0000 0010 0000 0000
 echo "########################################"
 echo "########################################"
 echo "########################################"
 echo "########################################"
 			   
 echo "msgdma : Control,  wait for resp and go"
-devmem2  $(($msgdma_descriptorslave+$msgdma_descriptorslave_control)) w 0x82000000;   #1000 0010 0000 0000
+devmem2  $(($msgdma_descriptorlave+$msgdma_descriptorlave_control)) w 0x82000000;   #1000 0010 0000 0000
 #	If this was more complex, or non 0 I would be using byte accesses to write, not a single word access
 echo "########################################"
 
