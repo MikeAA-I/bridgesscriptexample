@@ -1,7 +1,4 @@
 #!/bin/bash
-#ln -s /drop/hpsF_rsu_DMA_21.2Intelsof_UB202101Patched2_App_v02.core.rbf /lib/firmware/fpga_core.rbf
-#./run_apply.bash &
-
 
 help()
 {
@@ -254,11 +251,11 @@ devmem2 0xf9000000 w
 
 #SDRAM Direct tests
 #1. Privalged only 
-#-Wrtie to manually reserved area via dma secure tansaction attributes 
+#-Write to manually reserved area via dma secure tansaction attributes 
 #-Read back from user space
 
 #2. Privalge and secure 
-#-Wrtie to manually reserved area via dma using secure and protected transaction attributes 
+#-Write to manually reserved area via dma using secure and protected transaction attributes 
 #-Read back from user space
 
 #Cache tests
@@ -289,7 +286,7 @@ echo "########################################"
 if [ $select == "po" ]; then 
 
 echo "1 SDRAM Direct Secure"
-#1. Privalged only 
+#1. Privileged only 
 #-Wrtie to manually reserved area via dma secure tansaction attributes 
 #-Read back from user space
 
@@ -337,15 +334,12 @@ devmem2 $icct_csr w 0x3C108208 #secure Note: This is the normally required value
 
 elif [ $select == "cu" ]; then 
 echo  "3 CCU uncached  "
-#Cache tests
 #3. non cashed transactions
 #-Write to cashed area from user space
 #-Write to cached area via dma in non cachsed mode 
 #-Read back from user space
 
-
-#CCU_cached="enabled"
-  # trigger a write from user space to the write data buffer area...  which I think the arm caches..
+# trigger a write from user space to the write data buffer area.
 datapattern_buffer0=0xAAAA0000
 datapattern_buffer1=0x05050505
 
@@ -365,8 +359,8 @@ devmem2 $icct_csr w 0x20982302 #secure
 
 elif [ $select == "cc" ]; then 
 echo  "4 CCU cached  "
+
 #Cache tests
-#3. non cashed transactions
 #-Write to cashed area from user space
 #-Write to cached area via dma in  cached mode 
 #-Read back from user space
@@ -381,7 +375,6 @@ dma_read_pointer_low=$read_buffer0_manual_reserved
 dma_read_pointer_high=00000000
 
 dma_write_pointer_low=$write_buffer_cma_reserved 
-#dma_write_pointer_low=$write_buffer_manual_reserved
 dma_write_pointer_high=00000000
 
 #SET ACCERSS MODE 
@@ -390,38 +383,6 @@ dma_write_pointer_high=00000000
 devmem2 $icct_csr w 0x20F82F02 #secure
 
 fi
-
-
-
-if [ 1 = 0 ]; then 
-   datapattern_buffer0=0xAAAA0000
-   datapattern_buffer2=0xBBBB0000
-
-
-  dma_read_pointer_low=$read_buffer0_manual_reserved
-  #dma_read_pointer_low=$read_buffer1_cma_reserved
-  dma_read_pointer_high=00000000
-
-  dma_write_pointer_low=$write_buffer_cma_reserved
-  dma_write_pointer_high=00000000
-
-
-  #SET ACCERSS MODE 
-
-  #echo "Set ACE-LITE Bridge to via CCU Cached Mode : 0x60F82F02"
-  #devmem2 $icct_csr w 0x60F82F02
-  #devmem2 $icct_csr w 0x20F82F02 #secure
-
-
-  echo "Set ACE-LITE Bridge to via CCU Non-Cached Mode : 0x60F82F02"
-  devmem2 $icct_csr w 0x60982302
-  #devmem2 $icct_csr w 0x20982302 #secure 
-
-  #echo "Set ACE-LITE Bridge to defaults : 0x20108208"
-  #devmem2 $icct_csr w 0x20108208
-
-fi
-
 
 ######################################################################################
 ######################################################################################
